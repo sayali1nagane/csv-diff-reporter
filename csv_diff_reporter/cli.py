@@ -1,4 +1,4 @@
-"""Command-line entry point for csv-diff-reporter."""
+"""Command-line interface for csv-diff-reporter."""
 
 from __future__ import annotations
 
@@ -6,61 +6,74 @@ import argparse
 import sys
 from pathlib import Path
 
-from .differ import diff_csv
-from .parser import CSVParseError, load_csv
-from .reporter import generate_report
+from csv_diff_reporter.differ import diff_csv
+from csv_diff_reporter.formatter import OutputFormat, format_output
+from csv_diff_reporter.parser import CSVParseError, load_csv
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog="csv-diff-reporter",
         description="Compare two CSV files and generate a human-readable diff report.",
     )
-    p.add_argument("old", type=Path, help="Path to the original CSV file.")
-    p.add_argument("new", type=Path, help="Path to the updated CSV file.")
-    p.add_argument(
-        "-k",
-        "--key-column",
-        default=None,
+    parser.add_argument("old_file", type=Path, help="Path to the original CSV file.")
+    parser.add_argument("new_file", type=Path, help="Path to the updated CSV file.")
+    parser.add_argument(
+        "--key",
         metavar="COLUMN",
-        help="Column name to use as the row key (default: row index).",
+        default=None,
+        help="Column name to use as the row identifier (default: row index).",
     )
-    p.add_argument(
-        "-o",
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["text", "json", "markdown"],
+        default="text",
+        help="Output format (default: text).",
+    )
+    parser.add_argument(
         "--output",
+        "-o",
+        metavar="FILE",
         type=Path,
         default=None,
-        metavar="FILE",
-        help="Write the report to FILE instead of stdout.",
+        help="Write report to FILE instead of stdout.",
     )
-    return p
+    parser.add_argument(
+        "--exit-code",
+        action="store_true",
+        default=False,
+        help="Exit with code 1 when differences are found.",
+    )
+    return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run the CLI. Returns an exit code."""
+def main(argv: list[str] | None = None) -> int:  # noqa: D401
     parser = build_parser()
     args = parser.parse_args(argv)
 
     try:
-        old_rows = load_csv(args.old, key_column=args.key_column)
-        new_rows = load_csv(args.new, key_column=args.key_column)
-    except FileNotFoundError as exc:
+        old_rows = load_csv(args.old_file, key_column=args.key)
+        new_rows = load_csv(args.new_file, key_column=args.key)
+    except (CSVParseError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return 2
-    except CSVParseError as exc:
-        print(f"parse error: {exc}", file=sys.stderr)
         return 2
 
     result = diff_csv(old_rows, new_rows)
+    report = format_output(result, fmt=args.output_format)  # type: OutputFormat
 
     if args.output:
-        with args.output.open("w", encoding="utf-8") as fh:
-            generate_report(result, file=fh)
-        print(f"Report written to {args.output}")
+        try:
+            args.output.write_text(report, encoding="utf-8")
+        except OSError as exc:
+            print(f"error: could not write output file: {exc}", file=sys.stderr)
+            return 2
     else:
-        print(generate_report(result), end="")
+        print(report)
 
-    return 1 if result.diffs else 0
+    if args.exit_code and result.total_changes > 0:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -48,13 +48,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _load_csv_files(
+    old_file: Path, new_file: Path, key: str | None
+) -> tuple[list, list]:
+    """Load both CSV files, raising SystemExit with a helpful message on failure.
+
+    Returns a tuple of (old_rows, new_rows).
+    """
+    old_rows = load_csv(old_file, key_column=key)
+    new_rows = load_csv(new_file, key_column=key)
+    return old_rows, new_rows
+
+
 def main(argv: list[str] | None = None) -> int:  # noqa: D401
     parser = build_parser()
     args = parser.parse_args(argv)
 
     try:
-        old_rows = load_csv(args.old_file, key_column=args.key)
-        new_rows = load_csv(args.new_file, key_column=args.key)
+        old_rows, new_rows = _load_csv_files(args.old_file, args.new_file, args.key)
     except (CSVParseError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

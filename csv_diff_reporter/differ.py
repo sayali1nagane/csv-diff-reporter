@@ -31,6 +31,15 @@ class DiffResult:
     def is_empty(self) -> bool:
         return self.total_changes == 0
 
+    def summary(self) -> str:
+        """Return a human-readable summary of the diff result."""
+        return (
+            f"{len(self.added)} added, "
+            f"{len(self.removed)} removed, "
+            f"{len(self.modified)} modified "
+            f"({self.total_changes} total)"
+        )
+
 
 def diff_csv(
     old_data: dict[str, dict[str, Any]],

@@ -11,6 +11,9 @@ SortOrder = Literal["asc", "desc"]
 
 _CHANGE_TYPE_ORDER = {"added": 0, "removed": 1, "modified": 2}
 
+_VALID_SORT_KEYS = frozenset(SortKey.__args__)  # type: ignore[attr-defined]
+_VALID_SORT_ORDERS = frozenset(SortOrder.__args__)  # type: ignore[attr-defined]
+
 
 def _change_type(row: RowDiff) -> str:
     if row.old is None:
@@ -36,18 +39,30 @@ def sort_diff(
         ``"type"`` groups rows by change type (added → removed → modified).
     order:
         ``"asc"`` for ascending, ``"desc"`` for descending.
+
+    Raises
+    ------
+    ValueError
+        If *by* or *order* is not a recognised value.
     """
+    if by not in _VALID_SORT_KEYS:
+        raise ValueError(
+            f"Unknown sort key: {by!r}. Expected one of {sorted(_VALID_SORT_KEYS)}."
+        )
+    if order not in _VALID_SORT_ORDERS:
+        raise ValueError(
+            f"Unknown sort order: {order!r}. Expected one of {sorted(_VALID_SORT_ORDERS)}."
+        )
+
     reverse = order == "desc"
 
     if by == "key":
         sorted_rows = sorted(result.rows, key=lambda r: r.key, reverse=reverse)
-    elif by == "type":
+    else:  # by == "type"
         sorted_rows = sorted(
             result.rows,
             key=lambda r: _CHANGE_TYPE_ORDER[_change_type(r)],
             reverse=reverse,
         )
-    else:
-        raise ValueError(f"Unknown sort key: {by!r}")
 
     return DiffResult(rows=sorted_rows, headers=result.headers)

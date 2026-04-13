@@ -82,3 +82,27 @@ def get_headers(filepath: str) -> list:
             return list(reader.fieldnames)
     except (OSError, csv.Error) as exc:
         raise CSVParseError(f"Failed to read headers from {filepath}: {exc}") from exc
+
+
+def get_row_count(filepath: str) -> int:
+    """
+    Return the number of data rows in a CSV file, excluding the header.
+
+    Args:
+        filepath: Path to the CSV file.
+
+    Returns:
+        Integer count of data rows.
+
+    Raises:
+        CSVParseError: If the file cannot be read or parsed.
+    """
+    path = Path(filepath)
+    try:
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames is None:
+                raise CSVParseError(f"CSV file is empty or has no headers: {filepath}")
+            return sum(1 for _ in reader)
+    except (OSError, csv.Error) as exc:
+        raise CSVParseError(f"Failed to count rows in {filepath}: {exc}") from exc

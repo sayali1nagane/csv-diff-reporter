@@ -1,57 +1,65 @@
-"""High-level pipeline that wires parser, differ, summary, and formatter."""
-from dataclasses import dataclass
+"""High-level pipeline: load → validate → diff → export."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
-from csv_diff_reporter.parser import load_csv, get_row_count, CSVParseError
-from csv_diff_reporter.differ import diff_csv, DiffResult
-from csv_diff_reporter.summary import DiffSummary, compute_summary
-from csv_diff_reporter.formatter import format_output
 from csv_diff_reporter.validator import validate_inputs, ValidationError
+from csv_diff_reporter.parser import load_csv, CSVParseError
+from csv_diff_reporter.differ import diff_csv, DiffResult
+from csv_diff_reporter.summary import compute_summary, DiffSummary
+from csv_diff_reporter.exporter import export, ExportError
 
 
 @dataclass
 class PipelineResult:
-    """Container for all artefacts produced by the pipeline."""
-    diff: DiffResult
-    summary: DiffSummary
-    output: str
+    success: bool
+    diff: Optional[DiffResult] = None
+    summary: Optional[DiffSummary] = None
+    error: str = ""
+    warnings: list[str] = field(default_factory=list)
 
 
 def run_pipeline(
-    file_a: str,
-    file_b: str,
+    file_a: Path,
+    file_b: Path,
     key_column: Optional[str] = None,
-    output_format: str = "text",
+    fmt: str = "text",
+    output_path: Optional[Path] = None,
 ) -> PipelineResult:
-    """Execute the full diff pipeline and return structured results.
+    """Execute the full diff pipeline and return a :class:`PipelineResult`."""
+    # 1. Validate inputs
+    try:
+        validation = validate_inputs(file_a, file_b)
+        if not validation:
+            return PipelineResult(success=False, error=str(validation))
+    except ValidationError as exc:
+        return PipelineResult(success=False, error=str(exc))
 
-    Args:
-        file_a: Path to the original CSV file.
-        file_b: Path to the new CSV file.
-        key_column: Column name to use as row identifier. If None, row index
-                    is used.
-        output_format: One of 'text', 'json', or 'markdown'.
+    # 2. Parse CSV files
+    try:
+        rows_a = load_csv(file_a, key_column=key_column)
+        rows_b = load_csv(file_b, key_column=key_column)
+    except CSVParseError as exc:
+        return PipelineResult(success=False, error=str(exc))
 
-    Returns:
-        A PipelineResult containing the diff, summary, and formatted output.
-
-    Raises:
-        ValidationError: If either file path fails validation.
-        CSVParseError: If a file cannot be parsed.
-        ValueError: If output_format is not recognised.
-    """
-    validation = validate_inputs(file_a, file_b)
-    if not validation:
-        raise ValidationError(str(validation))
-
-    rows_a = load_csv(file_a, key_column=key_column)
-    rows_b = load_csv(file_b, key_column=key_column)
-
-    count_a = get_row_count(file_a)
-    count_b = get_row_count(file_b)
-
+    # 3. Diff
     diff = diff_csv(rows_a, rows_b)
-    summary = compute_summary(diff, total_rows_old=count_a, total_rows_new=count_b)
-    output = format_output(diff, fmt=output_format)
 
-    return PipelineResult(diff=diff, summary=summary, output=output)
+    # 4. Summarise
+    summary = compute_summary(diff)
+
+    # 5. Export
+    try:
+        export(diff, fmt=fmt, output_path=output_path)
+    except ExportError as exc:
+        return PipelineResult(
+            success=False,
+            diff=diff,
+            summary=summary,
+            error=str(exc),
+        )
+
+    return PipelineResult(success=True, diff=diff, summary=summary)

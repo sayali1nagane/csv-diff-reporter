@@ -87,3 +87,11 @@ def test_diff_multiple_changed_fields():
     result = diff_csv(old, new)
     assert len(result.modified) == 1
     assert result.modified[0].changed_fields == {"a": ("1", "9"), "b": ("2", "8")}
+
+
+def test_diff_modified_row_contains_old_and_new_row():
+    """Modified rows should carry both old_row and new_row for context."""
+    result = diff_csv(OLD, NEW)
+    mod = result.modified[0]
+    assert mod.old_row == OLD["1"]
+    assert mod.new_row == NEW["1"]

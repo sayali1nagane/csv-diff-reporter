@@ -60,6 +60,20 @@ def _load_csv_files(
     return old_rows, new_rows
 
 
+def _write_report(report: str, output: Path) -> int:
+    """Write *report* to *output*, returning an exit code.
+
+    Returns 0 on success, or 2 if the file cannot be written, printing an
+    error message to stderr in that case.
+    """
+    try:
+        output.write_text(report, encoding="utf-8")
+    except OSError as exc:
+        print(f"error: could not write output file: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:  # noqa: D401
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -74,11 +88,9 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D401
     report = format_output(result, fmt=args.output_format)  # type: OutputFormat
 
     if args.output:
-        try:
-            args.output.write_text(report, encoding="utf-8")
-        except OSError as exc:
-            print(f"error: could not write output file: {exc}", file=sys.stderr)
-            return 2
+        rc = _write_report(report, args.output)
+        if rc != 0:
+            return rc
     else:
         print(report)
 

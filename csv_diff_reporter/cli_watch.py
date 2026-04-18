@@ -47,6 +47,14 @@ def _make_on_change(args: argparse.Namespace) -> None:
     return _callback
 
 
+def _validate_watch_paths(path_a: Path, path_b: Path) -> None:
+    """Raise SystemExit with a clear message if either input file is missing."""
+    for path in (path_a, path_b):
+        if not path.exists():
+            print(f"[watch] error: file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+
+
 def apply_watch(args: argparse.Namespace, remaining_argv: List[str]) -> bool:
     """If --watch is set, start the watch loop and return True.
 
@@ -57,6 +65,7 @@ def apply_watch(args: argparse.Namespace, remaining_argv: List[str]) -> bool:
 
     path_a = Path(args.file_a)
     path_b = Path(args.file_b)
+    _validate_watch_paths(path_a, path_b)
     options = WatchOptions(
         interval=getattr(args, "watch_interval", 2.0),
         on_change=_make_on_change(args),

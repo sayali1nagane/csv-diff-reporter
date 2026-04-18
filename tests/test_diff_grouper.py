@@ -83,3 +83,11 @@ def test_group_keys_are_sorted():
 def test_rows_for_unknown_key_returns_empty():
     grouped = GroupedDiff(column="region", groups={"EU": []})
     assert grouped.rows_for("UNKNOWN") == []
+
+
+def test_total_rows_counts_across_all_groups():
+    r1 = _row("1", "added", new_fields={"region": "EU"})
+    r2 = _row("2", "added", new_fields={"region": "EU"})
+    r3 = _row("3", "added", new_fields={"region": "US"})
+    grouped = group_diff(_result(r1, r2, r3), GroupOptions(column="region"))
+    assert grouped.total_rows() == 3

@@ -87,6 +87,13 @@ def test_truncate_limit_zero():
     assert tr.dropped == 2
 
 
+def test_truncate_negative_limit_raises():
+    """A negative limit is invalid and should raise a ValueError."""
+    result = _result("a", "b")
+    with pytest.raises(ValueError, match="limit"):
+        truncate_diff(result, limit=-1)
+
+
 # ---------------------------------------------------------------------------
 # format_truncation_notice
 # ---------------------------------------------------------------------------
@@ -104,4 +111,4 @@ def test_format_notice_truncated_contains_counts():
     assert "2" in notice
     assert "4" in notice
     assert "2" in notice  # dropped count also 2
-    assert "Truncated" in notice
+    assert "Truncated"

@@ -25,6 +25,18 @@ def add_row_limit_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _validate_max_rows(max_rows: int | None) -> None:
+    """Raise :class:`argparse.ArgumentTypeError` if *max_rows* is not a positive integer.
+
+    This provides a clearer error message than the default argparse behaviour,
+    which would silently accept zero or negative values.
+    """
+    if max_rows is not None and max_rows < 1:
+        raise argparse.ArgumentTypeError(
+            f"--max-rows must be a positive integer, got {max_rows!r}"
+        )
+
+
 def apply_row_limit_from_args(
     args: argparse.Namespace,
     data: Dict[str, List[dict]],
@@ -33,8 +45,13 @@ def apply_row_limit_from_args(
 
     Prints a warning to *stderr* when rows are dropped (unless suppressed).
 
+    Raises :class:`argparse.ArgumentTypeError` if ``--max-rows`` is not a
+    positive integer.
+
     Returns the (possibly truncated) data mapping.
     """
+    _validate_max_rows(args.max_rows)
+
     options = RowLimitOptions(
         max_rows=args.max_rows,
         warn_on_truncation=not args.no_row_limit_warning,
